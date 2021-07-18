@@ -21,7 +21,7 @@
 #define battLED4_PIN        17
 #define lostLED_PIN         18
 
-#define mode_PIN            9
+#define mode_PIN            5
 #define pairing_PIN         10
 /* 
  * TODO: Fine the correct pin for the battery voltage. 

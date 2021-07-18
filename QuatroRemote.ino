@@ -28,6 +28,8 @@
 
 */
 
+// TODO: Fix status reporting using millis()
+
 #include <stdint.h>
 #include <SPI.h>
 #include <EEPROM.h>
@@ -51,6 +53,8 @@ int pairingButtonState;               // the current reading from the input pin
 int lastPairingButtonState = HIGH;    // the previous reading from the input pin
 unsigned long lastPairingButtonDebounceTime = 0;  // the last time the output pin was toggled
 unsigned long pairingButtonDebounceDelay = 50;    // the debounce time; increase if the output flickers
+
+unsigned long lastTimeSinceStatusReport = 0;
 
 // Throttle calibration values
 uint16_t minThrottleADC = 1024;
@@ -83,6 +87,8 @@ uint8_t boardMax = 230; // Value at which the board produces max brake torque - 
 void setup() {
   // initialize serial communications at 9600 bps:
   Serial.begin(115200);
+  lastTimeSinceStatusReport = millis();
+  
   // put your setup code here, to run once:
   pinMode(3, OUTPUT);  // Debug Pin to measure total time of pairing
   pinMode(CS_PIN, OUTPUT);  // CS is the chip send trigger of the NRF
@@ -144,6 +150,7 @@ void setup() {
      6. Save all values to EEPROM
   */
 
+  //if ((analogRead(A7) > 600))// && (digitalRead(mode_PIN) == LOW))
   if ((analogRead(A7) > 600) && (digitalRead(mode_PIN) == LOW))
   {
     Serial.println("Starting Throttle Calibration");
@@ -299,6 +306,14 @@ void loop() {
     //delay(10);
   }
 
+  // Report battery voltage every 5 seconds
+  if (millis() - lastTimeSinceStatusReport > 5000)
+  {
+    lastTimeSinceStatusReport = millis();
+    Serial.print("Battery Voltage: ");
+    Serial.println(remoteBatteryVoltage);
+  }
+
   // Check for input:
   // read the state of the switch into a local variable:
   int reading = digitalRead(pairing_PIN);
@@ -392,6 +407,7 @@ void loop() {
                   boardDeadzoneMax,
                   boardCenter);
   //Serial.println(throttleValue);
+  //Serial.println("");
   
   // 6. Send value to board
   if (remoteBatteryLevelCritical)
@@ -581,8 +597,14 @@ void loop() {
             {
               tone(6, 200, 20);
               //delay(20);
-              Serial.print("P     EVERYTHING OTHER THAN 0x60 or 0x10: 0x");
-              Serial.println(status1, HEX);
+              //Serial.print("P     EVERYTHING OTHER THAN 0x60 or 0x10: 0x");
+              //Serial.println(status1, HEX);
+              
+              // Report status every 5 seconds
+              if (millis() - lastTimeSinceStatusReport > 5000)
+              {
+                Serial.println("FATAL: Remote in critical state! Re-pair with skateboard, recalibrate throttle!");
+              }
 
               driveState = checkStatus;
             }
@@ -623,7 +645,11 @@ void loop() {
       break;
 
     case lostRemote:
-      //Serial.println("  Lost Remote");
+      // Report status every 5 seconds
+      if (millis() - lastTimeSinceStatusReport > 5000)
+      {
+        Serial.println("  Connection to skateboard lost. Searching known frequencies using current pairing key...");
+      }
       digitalWrite(lostLED_PIN, HIGH);
       tone(6, 500, 20);
       //delay(20);
@@ -651,7 +677,7 @@ void loop() {
 
         if (lostCounter < 2)
         {
-          Serial.println("Lost It");
+          //Serial.println("Lost It");
           mainState = driveRemote;
           driveState = sendMessage;
         }
@@ -666,12 +692,12 @@ void loop() {
         {
           numHopsTaken = 0;
           freqCounter--; // reduce frequency counter by one, otherwise we will never hit all of them but skip instead
-          Serial.println(lastKnownFrequency);
+          //Serial.println(lastKnownFrequency);
           status = write_ToAddress(W_REGISTER | RF_CH, frequencies[lastKnownFrequency]); // Set operating frequency to the last known working
         }
         else
         {
-          Serial.println(freqCounter);
+          //Serial.println(freqCounter);
           status = write_ToAddress(W_REGISTER | RF_CH, frequencies[freqCounter]); // Set operating frequency to the next possible frequency
         }
 
@@ -702,6 +728,10 @@ void loop() {
       //Serial.println("  Off Remote");
       digitalWrite(lostLED_PIN, LOW);
       break;
+  }
+  if (millis() - lastTimeSinceStatusReport > 5000)
+  {
+    lastTimeSinceStatusReport = millis();
   }
 }
 
