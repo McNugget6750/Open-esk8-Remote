@@ -304,14 +304,14 @@ void loop() {
   // ELSE is not required as one spike into low battery warning is enough to stop acceleration from functioning until after next restart. It can only be set once.
   
   remoteBatteryVoltage = 5.0f / 1024.0f * (float)analogRead(A5);
-  if (remoteBatteryVoltage < 2.45f)
+  if (remoteBatteryVoltage < 2.1f)
   {
     remoteBatteryLevelCritical = true; // Once set, it can't be reset until the remote is power cycled!
     tone(6, 2000, 100);
     //delay(100);
     //tone(6, 1000, 100);
     //delay(100);
-    //Serial.println("Remote control battery level critical!!");
+    Serial.println("Remote control battery level critical!!");
     //delay(10);
   }
 
@@ -509,12 +509,14 @@ void loop() {
                   boardDeadzoneMin,
                   boardDeadzoneMax,
                   boardCenter);
-  Serial.println(throttleValue);
+  //Serial.println(throttleValue);
   //Serial.println("");
 
   // Todo: If the battery is empty, we don't just want to cut power as that might be extremely dangerous!
   //       In that case, we want to ramp down the maximum available power within 10 seconds or so until idle is reached.
   // 6. Send value to board
+
+  // Check for critical battery voltage
   if (remoteBatteryLevelCritical)
     quatroMessage_1[1] = (throttleValue >= boardCenter) ? throttleValue : 128; // If throttlevalue < boardCenter (braking) do it. Otherwise, no acceleration
   else
