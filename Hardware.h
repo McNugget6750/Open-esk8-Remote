@@ -51,7 +51,7 @@ float rescaleADCThrottleValue(uint16_t input, uint16_t valueMIN, uint16_t valueM
 
 float exponentialCurve(float inputValue, float expoFactor);
 
-float pt1_damper (float input, float dampingFactor, float integralPart);
+float pt1_damper (float input, float dampingFactor, float integralPart, float &lastDampedValue, float &lastIntegralPart);
 
 float deadzoneCompensationAndRescale(float input, float posDeadZone, float negDeadZone, uint8_t boardMin, uint8_t boardMax, uint8_t boardDeadzoneMin, uint8_t boardDeadzoneMax, uint8_t boardCenter);
 

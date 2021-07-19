@@ -91,7 +91,7 @@ float rescaleADCThrottleValue(uint16_t input, uint16_t valueMIN, uint16_t valueM
  */
 float exponentialCurve(float inputValue, float expoFactor)
 {
-  return ((1 - expoFactor) * (inputValue * inputValue * inputValue) ) + ( expoFactor * inputValue);
+  return ( (1 - expoFactor) * (inputValue * inputValue * inputValue) ) + (expoFactor * inputValue);
 }
 
 // This function implements a digital filter to smoothen out user jitter on the throttle potentiometer -- UNTESTED

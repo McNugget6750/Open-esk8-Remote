@@ -49,10 +49,15 @@ enum calibrationStateMachine
 
 calibrationStateMachine throttleCalibration;
 // Pairing button definition
-int pairingButtonState;               // the current reading from the input pin
+int pairingButtonState = HIGH;               // the current reading from the input pin
 int lastPairingButtonState = HIGH;    // the previous reading from the input pin
+int modeButtonState = HIGH;               // the current reading from the input pin
+int lastModeButtonState = HIGH;    // the previous reading from the input pin
 unsigned long lastPairingButtonDebounceTime = 0;  // the last time the output pin was toggled
 unsigned long pairingButtonDebounceDelay = 50;    // the debounce time; increase if the output flickers
+
+unsigned long lastModeButtonDebounceTime = 0;  // the last time the output pin was toggled
+unsigned long modeButtonDebounceDelay = 50;    // the debounce time; increase if the output flickers
 
 unsigned long lastTimeSinceStatusReport = 0;
 
@@ -67,8 +72,8 @@ bool throttleCalibrated = true;
 
 // Throttle Output filtering
 float lastDampedValue = 0;
-float dampingFactor = 0.1;
-float integralPart = 0.01;
+float dampingFactor = 0.05;
+float integralPart = 0.00; // LEAVE AT ZERO! NOT STABLE!
 float lastIntegralPart = 0;
 
 // ACTON BLINK QU4TRO related values
@@ -85,7 +90,7 @@ uint8_t boardMin = 32; // Value at which the board produces max acceleration tor
 uint8_t boardMax = 230; // Value at which the board produces max brake torque - TODO GUESS BETTER!
 
 void setup() {
-  // initialize serial communications at 9600 bps:
+  // initialize serial communications at 115200 bps:
   Serial.begin(115200);
   lastTimeSinceStatusReport = millis();
   
@@ -123,6 +128,7 @@ void setup() {
   mainState = initRemote;
   driveState = sendMessage;
   pairingState = initPairing_1;
+  performanceState = sport;
   set_batteryState(0xFF);
   messageType = false;
 
@@ -300,9 +306,12 @@ void loop() {
   remoteBatteryVoltage = 5.0f / 1024.0f * (float)analogRead(A5);
   if (remoteBatteryVoltage < 2.45f)
   {
-    remoteBatteryLevelCritical = true;
-    //tone(2000,10);
-    Serial.println("Remote control battery level critical!!");
+    remoteBatteryLevelCritical = true; // Once set, it can't be reset until the remote is power cycled!
+    tone(6, 2000, 100);
+    //delay(100);
+    //tone(6, 1000, 100);
+    //delay(100);
+    //Serial.println("Remote control battery level critical!!");
     //delay(10);
   }
 
@@ -352,7 +361,79 @@ void loop() {
   // it'll be the lastButtonState:
   lastPairingButtonState = reading;
 
+ // Check for input:
+  // read the state of the switch into a local variable:
+  reading = digitalRead(mode_PIN);
 
+  // check to see if you just pressed the button
+  // (i.e. the input went from LOW to HIGH),  and you've waited
+  // long enough since the last press to ignore any noise:
+
+  // If the switch changed, due to noise or pressing:
+  if (reading != lastModeButtonState) {
+    // reset the debouncing timer
+    lastModeButtonDebounceTime = millis();
+  }
+
+  if ((millis() - lastModeButtonDebounceTime) > modeButtonDebounceDelay) {
+    // whatever the reading is at, it's been there for longer
+    // than the debounce delay, so take it as the actual current state:
+
+    // if the button state has changed:
+    if (reading != modeButtonState) {
+      if (reading == LOW)
+      {
+        //Serial.println("Mode key was pressed");
+      }
+      if (reading == HIGH)
+      {
+        switch (performanceState)
+        {
+          case sport:
+            Serial.println("Switching to cruise mode!");
+            performanceState = cruiser;
+            tone(6, 400, 250);
+            delay(100);
+            tone(6, 600, 250);
+            delay(100);
+            tone(6, 600, 250);
+            delay(100);
+            tone(6, 400, 250);
+            delay(100);
+            break;
+          case cruiser:
+            Serial.println("Switching to beginner mode!");
+            performanceState = beginner;
+            tone(6, 1000, 100);
+            delay(100);
+            tone(6, 800, 100);
+            delay(100);
+            tone(6, 600, 100);
+            delay(100);
+            tone(6, 440, 100);
+            delay(100);
+            break;
+          case beginner:
+            Serial.println("Switching to sport mode!");
+            performanceState = sport;
+            tone(6, 440, 100);
+            delay(100);
+            tone(6, 600, 100);
+            delay(100);
+            tone(6, 800, 100);
+            delay(100);
+            tone(6, 1000, 100);
+            delay(100);
+            break;
+        }
+      }
+      modeButtonState = reading;
+    }
+  }
+
+  // save the reading.  Next time through the loop,
+  // it'll be the lastButtonState:
+  lastModeButtonState = reading;
 
   /* Main state machine for pairing, init, drive, connection lost
      If the remote was never paired, it enforces pairing.
@@ -388,15 +469,37 @@ void loop() {
   // 1. Read ACD
   uint16_t throttleValue = analogRead(A7);
   //Serial.println(throttleValue);
-  // 2.
+  // 2. calculate a value between -1 and +1
   float throttle = rescaleADCThrottleValue(throttleValue, minThrottleADC, maxThrottleADC, centerThrottleADC);
   //Serial.println(throttle);
   // 3. Calculate Expo
-  throttle = exponentialCurve(throttle, expoFactor);
+  throttle = exponentialCurve(throttle, expoFactor); // currently set to 1.0 which doesn't do anything. Turns out the remote already feels good without expo.
   //Serial.println(throttle);
   // 4. Filter
   // TODO
-  // 5. Rescale
+  // 5. Modes
+  switch(performanceState)
+  {
+    case sport:
+      expoFactor = 1.0;
+      break;
+    case cruiser:
+      expoFactor = 0.8;
+      if (throttle < 0)
+        throttle = throttle * 0.5;
+      else
+        throttle = throttle * 1;
+      throttle = pt1_damper (throttle, dampingFactor, integralPart, lastDampedValue, lastIntegralPart);
+      break;
+    case beginner:
+      if (throttle < 0)
+        throttle = throttle * 0.35;
+      else
+        throttle = throttle * 0.55;
+      throttle = pt1_damper (throttle, dampingFactor / 3, integralPart, lastDampedValue, lastIntegralPart);
+      break;
+  }
+  // 6. Rescale
   //    Remove Deadzone
   throttleValue = deadzoneCompensationAndRescale(throttle,
                   posDeadZone,
@@ -406,9 +509,11 @@ void loop() {
                   boardDeadzoneMin,
                   boardDeadzoneMax,
                   boardCenter);
-  //Serial.println(throttleValue);
+  Serial.println(throttleValue);
   //Serial.println("");
-  
+
+  // Todo: If the battery is empty, we don't just want to cut power as that might be extremely dangerous!
+  //       In that case, we want to ramp down the maximum available power within 10 seconds or so until idle is reached.
   // 6. Send value to board
   if (remoteBatteryLevelCritical)
     quatroMessage_1[1] = (throttleValue >= boardCenter) ? throttleValue : 128; // If throttlevalue < boardCenter (braking) do it. Otherwise, no acceleration
@@ -453,7 +558,7 @@ void loop() {
     /*******************   REMOTE OPERATION AND INITIALIZATION    *****************************************************/
     /******************************************************************************************************************/
     case initRemote:
-      Serial.println("  Init Remote");
+      //Serial.println("  Init Remote");
       digitalWrite(lostLED_PIN, HIGH);
 
       if (freqCounter > 15) // Sanity check on the frequency counter
@@ -565,7 +670,7 @@ void loop() {
             }
             else if (status1 & 0x10) // MAX_RTR was set - this happens quite often!
             {
-              tone(6, 800, 20);
+              //tone(6, 800, 20);
               //delay(20);
               //Serial.print("P     A PACKAGE COULD NOT BE TRANSMITTED TO THE BOARD: 0x");
               //Serial.println(status1, HEX);
@@ -595,7 +700,7 @@ void loop() {
             }
             else // Whatever else happens, go back to check status. Since we captured all other IRQ sources above, this is obsolete and only serves reliability
             {
-              tone(6, 200, 20);
+              //tone(6, 200, 20);
               //delay(20);
               //Serial.print("P     EVERYTHING OTHER THAN 0x60 or 0x10: 0x");
               //Serial.println(status1, HEX);
