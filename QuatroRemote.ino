@@ -73,6 +73,7 @@ bool throttleCalibrated = true;
 // Throttle Output filtering
 float lastDampedValue = 0;
 float dampingFactor = 0.05;
+float dampingFactorDriveModeModifier = 10;
 float integralPart = 0.00; // LEAVE AT ZERO! NOT STABLE!
 float lastIntegralPart = 0;
 
@@ -475,6 +476,8 @@ void loop() {
   // 3. Calculate Expo
   throttle = exponentialCurve(throttle, expoFactor); // currently set to 1.0 which doesn't do anything. Turns out the remote already feels good without expo.
   //Serial.println(throttle);
+  //Serial.println(lastDampedValue);
+  
   // 4. Filter
   // TODO
   // 5. Modes
@@ -483,20 +486,69 @@ void loop() {
     case sport:
       expoFactor = 1.0;
       break;
+      
     case cruiser:
-      expoFactor = 0.8;
-      if (throttle < 0)
-        throttle = throttle * 0.5;
+      if (throttle < -0.04) // accelerate
+      {
+        // If we braked and want to accellerate, it must be instant:
+        if (lastDampedValue > 0)
+          dampingFactorDriveModeModifier = 0.5;
+        else
+          dampingFactorDriveModeModifier = 10;
+        expoFactor = 1;
+        throttle = throttle * 0.62;
+        throttle = pt1_damper (throttle, dampingFactor / dampingFactorDriveModeModifier, integralPart, lastDampedValue, lastIntegralPart);
+      }
+      else if (throttle > 0.04) // brake
+      {
+        // If we accellerated and want to brake, it must be instant:
+        if (lastDampedValue < 0)
+          dampingFactorDriveModeModifier = 0.5;
+        else
+          dampingFactorDriveModeModifier = 2.5;
+        expoFactor = 0.8;
+        throttle = throttle * 1.0;
+        throttle = pt1_damper (throttle, dampingFactor / dampingFactorDriveModeModifier, integralPart, lastDampedValue, lastIntegralPart);
+      }
       else
-        throttle = throttle * 1;
-      throttle = pt1_damper (throttle, dampingFactor, integralPart, lastDampedValue, lastIntegralPart);
+      {
+        dampingFactorDriveModeModifier = 2;
+        expoFactor = 1;
+        throttle = throttle * 1.0;
+        throttle = pt1_damper (throttle, dampingFactor * dampingFactorDriveModeModifier, integralPart, lastDampedValue, lastIntegralPart);
+      }
       break;
+      
     case beginner:
-      if (throttle < 0)
+      if (throttle < -0.04) // accelerate
+      {
+        // If we braked and want to accellerate, it must be instant:
+        if (lastDampedValue > 0)
+          dampingFactorDriveModeModifier = 1;
+        else
+          dampingFactorDriveModeModifier = 3;
+        expoFactor = 1;
         throttle = throttle * 0.35;
+        throttle = pt1_damper (throttle, dampingFactor / dampingFactorDriveModeModifier, integralPart, lastDampedValue, lastIntegralPart);
+      }
+      else if (throttle > 0.04) // brake
+      {
+        // If we accellerated and want to brake, it must be instant:
+        if (lastDampedValue < 0)
+          dampingFactorDriveModeModifier = 1;
+        else
+          dampingFactorDriveModeModifier = 3;
+        expoFactor = 1;
+        throttle = throttle * 0.65;
+        throttle = pt1_damper (throttle, dampingFactor / dampingFactorDriveModeModifier, integralPart, lastDampedValue, lastIntegralPart);
+      }
       else
-        throttle = throttle * 0.55;
-      throttle = pt1_damper (throttle, dampingFactor / 3, integralPart, lastDampedValue, lastIntegralPart);
+      {
+        dampingFactorDriveModeModifier = 1;
+        expoFactor = 1;
+        throttle = throttle * 1.0;
+        throttle = pt1_damper (throttle, dampingFactor * dampingFactorDriveModeModifier, integralPart, lastDampedValue, lastIntegralPart);
+      }
       break;
   }
   // 6. Rescale
@@ -509,7 +561,7 @@ void loop() {
                   boardDeadzoneMin,
                   boardDeadzoneMax,
                   boardCenter);
-  //Serial.println(throttleValue);
+  Serial.println(throttleValue);
   //Serial.println("");
 
   // Todo: If the battery is empty, we don't just want to cut power as that might be extremely dangerous!
