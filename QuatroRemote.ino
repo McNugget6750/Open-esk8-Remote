@@ -90,6 +90,9 @@ uint8_t boardCenter = 128;
 uint8_t boardMin = 32; // Value at which the board produces max acceleration torque
 uint8_t boardMax = 230; // Value at which the board produces max brake torque - TODO GUESS BETTER!
 
+// Speed estimation model for less lag in cruise and beginner mode:
+float skateboardSpeed = 0.0; // value between 0 and 1 representing standstill to full throttle
+
 void setup() {
   // initialize serial communications at 115200 bps:
   Serial.begin(115200);
@@ -492,9 +495,9 @@ void loop() {
       {
         // If we braked and want to accellerate, it must be instant:
         if (lastDampedValue > 0)
-          dampingFactorDriveModeModifier = 0.5;
+          dampingFactorDriveModeModifier = 0.5; // Quick transition to braking
         else
-          dampingFactorDriveModeModifier = 10;
+          dampingFactorDriveModeModifier = 10; // smooth acceleration
         expoFactor = 1;
         throttle = throttle * 0.62;
         throttle = pt1_damper (throttle, dampingFactor / dampingFactorDriveModeModifier, integralPart, lastDampedValue, lastIntegralPart);
@@ -503,19 +506,19 @@ void loop() {
       {
         // If we accellerated and want to brake, it must be instant:
         if (lastDampedValue < 0)
-          dampingFactorDriveModeModifier = 0.5;
+          dampingFactorDriveModeModifier = 0.5; // Quick transition to acceleration 
         else
-          dampingFactorDriveModeModifier = 2.5;
+          dampingFactorDriveModeModifier = 2.5; // Smooth braking
         expoFactor = 0.8;
         throttle = throttle * 1.0;
         throttle = pt1_damper (throttle, dampingFactor / dampingFactorDriveModeModifier, integralPart, lastDampedValue, lastIntegralPart);
       }
       else
       {
-        dampingFactorDriveModeModifier = 2;
+        dampingFactorDriveModeModifier = 2; // Smooth throttle release
         expoFactor = 1;
         throttle = throttle * 1.0;
-        throttle = pt1_damper (throttle, dampingFactor * dampingFactorDriveModeModifier, integralPart, lastDampedValue, lastIntegralPart);
+        throttle = pt1_damper (throttle, dampingFactor / dampingFactorDriveModeModifier, integralPart, lastDampedValue, lastIntegralPart);
       }
       break;
       
@@ -524,9 +527,9 @@ void loop() {
       {
         // If we braked and want to accellerate, it must be instant:
         if (lastDampedValue > 0)
-          dampingFactorDriveModeModifier = 1;
+          dampingFactorDriveModeModifier = 0.5; // Quick transition to acceleration 
         else
-          dampingFactorDriveModeModifier = 3;
+          dampingFactorDriveModeModifier = 3; // Smooth braking
         expoFactor = 1;
         throttle = throttle * 0.35;
         throttle = pt1_damper (throttle, dampingFactor / dampingFactorDriveModeModifier, integralPart, lastDampedValue, lastIntegralPart);
@@ -535,19 +538,19 @@ void loop() {
       {
         // If we accellerated and want to brake, it must be instant:
         if (lastDampedValue < 0)
-          dampingFactorDriveModeModifier = 1;
+          dampingFactorDriveModeModifier = 0.2; // Quick transition to braking 
         else
-          dampingFactorDriveModeModifier = 3;
+          dampingFactorDriveModeModifier = 3; // Smooth braking
         expoFactor = 1;
         throttle = throttle * 0.65;
         throttle = pt1_damper (throttle, dampingFactor / dampingFactorDriveModeModifier, integralPart, lastDampedValue, lastIntegralPart);
       }
       else
       {
-        dampingFactorDriveModeModifier = 1;
+        dampingFactorDriveModeModifier = 10; // Very smooth throttle release
         expoFactor = 1;
         throttle = throttle * 1.0;
-        throttle = pt1_damper (throttle, dampingFactor * dampingFactorDriveModeModifier, integralPart, lastDampedValue, lastIntegralPart);
+        throttle = pt1_damper (throttle, dampingFactor / dampingFactorDriveModeModifier, integralPart, lastDampedValue, lastIntegralPart);
       }
       break;
   }
@@ -561,7 +564,8 @@ void loop() {
                   boardDeadzoneMin,
                   boardDeadzoneMax,
                   boardCenter);
-  Serial.println(throttleValue);
+  //Serial.println(throttleValue);
+  Serial.println(skateboardSpeed);
   //Serial.println("");
 
   // Todo: If the battery is empty, we don't just want to cut power as that might be extremely dangerous!
