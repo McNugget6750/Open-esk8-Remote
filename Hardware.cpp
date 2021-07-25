@@ -94,10 +94,9 @@ float exponentialCurve(float inputValue, float expoFactor)
   return ( (1 - expoFactor) * (inputValue * inputValue * inputValue) ) + (expoFactor * inputValue);
 }
 
-// This function implements a digital filter to smoothen out user jitter on the throttle potentiometer -- UNTESTED
+// This function implements a digital filter to smoothen out user jitter on the throttle potentiometer
 float pt1_damper (float input, float dampingFactor, float integralPart, float &lastDampedValue, float &lastIntegralPart)
 {
-  
   lastDampedValue = lastDampedValue + ((input - lastDampedValue) * dampingFactor);
   
   if (lastDampedValue < input)
@@ -107,6 +106,13 @@ float pt1_damper (float input, float dampingFactor, float integralPart, float &l
   
   lastDampedValue = lastDampedValue + lastIntegralPart;
   
+  return lastDampedValue;
+}
+
+// This function implements a digital filter to smoothen out user jitter on the throttle potentiometer -- UNTESTED
+float pt1_damper (float input, float dampingFactor, float &lastDampedValue)
+{
+  lastDampedValue = lastDampedValue + ((input - lastDampedValue) * dampingFactor);
   return lastDampedValue;
 }
 

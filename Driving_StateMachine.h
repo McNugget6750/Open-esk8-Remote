@@ -10,10 +10,12 @@
 enum mainStateMachine {pairingRemote, initRemote, driveRemote, lostRemote, idleRemote, offRemote};
 enum driveStateMachine {flushTX, clearPendingIRQ, sendMessage, checkStatus, receiveMessage};
 enum performanceStateMachine {sport, cruiser, beginner};
+enum velocityStateMachine {coast, accel, brake};
 
 extern volatile mainStateMachine mainState;
 extern volatile driveStateMachine driveState;
 extern volatile performanceStateMachine performanceState;
+extern volatile velocityStateMachine velocityState;
 
 extern volatile bool messageType;      // There are two messages to be sent to the board. False sends first, true the second
 extern volatile bool TX_DS_WasSetAlready_WaitFor_RX_DR;      // Extremely unusual state where ACK_PAYLOAD was lost and RX_DR never comes on

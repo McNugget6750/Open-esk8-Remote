@@ -92,6 +92,10 @@ uint8_t boardMax = 230; // Value at which the board produces max brake torque - 
 
 // Speed estimation model for less lag in cruise and beginner mode:
 float skateboardSpeed = 0.0; // value between 0 and 1 representing standstill to full throttle
+float lastSkateboardSpeed = 0.0; // value from last iteration of velocity model
+float skateboardSpeedAccelDampening = 0.004; // Factor describing acceleration behavior
+float skateboardSpeedCoastDecelIterator = 0.0001; // When coasting, using this simple integrator to reduce velocity
+float skateboardSpeedBrakeDecelFactor = 0.001; // When braking, using this factor to reduce velocity
 
 void setup() {
   // initialize serial communications at 115200 bps:
@@ -133,6 +137,7 @@ void setup() {
   driveState = sendMessage;
   pairingState = initPairing_1;
   performanceState = sport;
+  velocityState = coast;
   set_batteryState(0xFF);
   messageType = false;
 
@@ -500,6 +505,11 @@ void loop() {
           dampingFactorDriveModeModifier = 10; // smooth acceleration
         expoFactor = 1;
         throttle = throttle * 0.62;
+        if (velocityState == coast || velocityState == brake) // To reduce acceleration latency, we use the velocity model data to set the new current throttle value
+        {
+          lastDampedValue = lastSkateboardSpeed;
+          velocityState = accel;
+        }
         throttle = pt1_damper (throttle, dampingFactor / dampingFactorDriveModeModifier, integralPart, lastDampedValue, lastIntegralPart);
       }
       else if (throttle > 0.04) // brake
@@ -512,6 +522,7 @@ void loop() {
         expoFactor = 0.8;
         throttle = throttle * 1.0;
         throttle = pt1_damper (throttle, dampingFactor / dampingFactorDriveModeModifier, integralPart, lastDampedValue, lastIntegralPart);
+        velocityState = brake;
       }
       else
       {
@@ -519,6 +530,7 @@ void loop() {
         expoFactor = 1;
         throttle = throttle * 1.0;
         throttle = pt1_damper (throttle, dampingFactor / dampingFactorDriveModeModifier, integralPart, lastDampedValue, lastIntegralPart);
+        velocityState = coast;
       }
       break;
       
@@ -532,6 +544,11 @@ void loop() {
           dampingFactorDriveModeModifier = 3; // Smooth braking
         expoFactor = 1;
         throttle = throttle * 0.35;
+        if (velocityState == coast || velocityState == brake) // To reduce acceleration latency, we use the velocity model data to set the new current throttle value
+        {
+          lastDampedValue = lastSkateboardSpeed;
+          velocityState = accel;
+        }
         throttle = pt1_damper (throttle, dampingFactor / dampingFactorDriveModeModifier, integralPart, lastDampedValue, lastIntegralPart);
       }
       else if (throttle > 0.04) // brake
@@ -544,6 +561,7 @@ void loop() {
         expoFactor = 1;
         throttle = throttle * 0.65;
         throttle = pt1_damper (throttle, dampingFactor / dampingFactorDriveModeModifier, integralPart, lastDampedValue, lastIntegralPart);
+        velocityState = brake;
       }
       else
       {
@@ -551,9 +569,42 @@ void loop() {
         expoFactor = 1;
         throttle = throttle * 1.0;
         throttle = pt1_damper (throttle, dampingFactor / dampingFactorDriveModeModifier, integralPart, lastDampedValue, lastIntegralPart);
+        velocityState = coast;
       }
       break;
   }
+
+  // Velocity model
+//  float skateboardSpeed = 0.0; // value between 0 and 1 representing standstill to full throttle
+//  float lastSkateboardSpeed = 0.0; // value from last iteration of velocity model
+//  float skateboardSpeedAccelDampening = 0.05; // Lag between command and estimated skateboard velocity
+//  float skateboardSpeedDecelIterator = 0.001; // for now, this is tick based but it should be time based using millis()! TODO!
+
+  if (skateboardSpeed >= throttle)
+  {
+    skateboardSpeed = pt1_damper(throttle, skateboardSpeedAccelDampening, lastSkateboardSpeed);
+  }
+  else if(throttle > 0.04)
+  {
+    skateboardSpeed += skateboardSpeedBrakeDecelFactor * throttle;
+    lastSkateboardSpeed = skateboardSpeed;
+  }
+  else
+  {
+    skateboardSpeed += skateboardSpeedCoastDecelIterator;
+    lastSkateboardSpeed = skateboardSpeed;
+  }
+
+  if (skateboardSpeed < -1)
+    skateboardSpeed = -1;
+  else if (skateboardSpeed > 0)
+    skateboardSpeed =0;
+
+  Serial.print(throttle);
+  Serial.print(" ");
+  Serial.println(skateboardSpeed);
+//  Serial.print(" ");
+  
   // 6. Rescale
   //    Remove Deadzone
   throttleValue = deadzoneCompensationAndRescale(throttle,
@@ -564,8 +615,7 @@ void loop() {
                   boardDeadzoneMin,
                   boardDeadzoneMax,
                   boardCenter);
-  //Serial.println(throttleValue);
-  Serial.println(skateboardSpeed);
+//  Serial.println(throttleValue);
   //Serial.println("");
 
   // Todo: If the battery is empty, we don't just want to cut power as that might be extremely dangerous!
@@ -814,7 +864,7 @@ void loop() {
         Serial.println("  Connection to skateboard lost. Searching known frequencies using current pairing key...");
       }
       digitalWrite(lostLED_PIN, HIGH);
-      tone(6, 500, 20);
+//      tone(6, 500, 20);
       //delay(20);
 
       set_batteryState(0xFF);

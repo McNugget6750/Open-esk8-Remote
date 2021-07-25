@@ -9,7 +9,7 @@
 volatile mainStateMachine mainState;
 volatile driveStateMachine driveState;
 volatile performanceStateMachine performanceState;
-
+volatile velocityStateMachine velocityState;
 
 volatile bool messageType;      // There are two messages to be sent to the board. False sends first, true the second
 volatile bool TX_DS_WasSetAlready_WaitFor_RX_DR = false;      // Extremely unusual state where ACK_PAYLOAD was lost and RX_DR never comes on
