@@ -1,6 +1,6 @@
 /*
    Author: Timo Birnschein (timo.birnschein@microforge.de)
-   Date: 2018/07/03
+   Date: 2021/07/24
    License: LGPL
    Special thanks to Acton for making a remote so bad that it motivated me to
    reverse engineer it and make my own. It was an interesting task and I
@@ -20,15 +20,9 @@
    - User definable exponential function for smooth cruising and fast acceleration
    - Behavior for quick responses for fast accel and quick strong brakes based
      on how fast and how much the throttle was moved.
-     !!This needs to be carefully tuned because it can seriously surprise users!!
-
-   Note: The NRF driver is actualy not really a driver as it only replicates all
-   instructions the microprocessor of the remote was also sending to its NRF.
-   Therefore, please take this with a grain of salt.
-
 */
 
-// TODO: Fix status reporting using millis()
+// TODO: Change all filters to use time based filtering instead of ticks
 
 #include <stdint.h>
 #include <SPI.h>
@@ -574,12 +568,6 @@ void loop() {
       break;
   }
 
-  // Velocity model
-//  float skateboardSpeed = 0.0; // value between 0 and 1 representing standstill to full throttle
-//  float lastSkateboardSpeed = 0.0; // value from last iteration of velocity model
-//  float skateboardSpeedAccelDampening = 0.05; // Lag between command and estimated skateboard velocity
-//  float skateboardSpeedDecelIterator = 0.001; // for now, this is tick based but it should be time based using millis()! TODO!
-
   if (skateboardSpeed >= throttle)
   {
     skateboardSpeed = pt1_damper(throttle, skateboardSpeedAccelDampening, lastSkateboardSpeed);
@@ -598,12 +586,7 @@ void loop() {
   if (skateboardSpeed < -1)
     skateboardSpeed = -1;
   else if (skateboardSpeed > 0)
-    skateboardSpeed =0;
-
-  Serial.print(throttle);
-  Serial.print(" ");
-  Serial.println(skateboardSpeed);
-//  Serial.print(" ");
+    skateboardSpeed = 0;
   
   // 6. Rescale
   //    Remove Deadzone
@@ -615,8 +598,6 @@ void loop() {
                   boardDeadzoneMin,
                   boardDeadzoneMax,
                   boardCenter);
-//  Serial.println(throttleValue);
-  //Serial.println("");
 
   // Todo: If the battery is empty, we don't just want to cut power as that might be extremely dangerous!
   //       In that case, we want to ramp down the maximum available power within 10 seconds or so until idle is reached.
