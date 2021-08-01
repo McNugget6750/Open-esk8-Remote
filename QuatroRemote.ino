@@ -314,7 +314,8 @@ void loop() {
     //delay(100);
     //tone(6, 1000, 100);
     //delay(100);
-    Serial.println("Remote control battery level critical!!");
+    set_remoteBatteryAlarm();
+    Serial.println("Remote control battery level critical!!");    
     //delay(10);
   }
 
@@ -390,45 +391,76 @@ void loop() {
       }
       if (reading == HIGH)
       {
+        
+        digitalWrite(battLED1_PIN, LOW); // Battery status < 100%
+        digitalWrite(battLED2_PIN, LOW); // Battery status < 75%
+        digitalWrite(battLED3_PIN, LOW); // Battery status < 50%
+        digitalWrite(battLED4_PIN, LOW); // Battery status < 25%
         switch (performanceState)
         {
           case sport:
             Serial.println("Switching to cruise mode!");
             performanceState = cruiser;
             tone(6, 400, 250);
+            digitalWrite(battLED2_PIN, LOW); // Battery status < 75%
+            digitalWrite(battLED3_PIN, LOW); // Battery status < 50%
             delay(100);
             tone(6, 600, 250);
+            digitalWrite(battLED2_PIN, HIGH); // Battery status < 75%
+            digitalWrite(battLED3_PIN, HIGH); // Battery status < 50%
             delay(100);
             tone(6, 600, 250);
+            digitalWrite(battLED2_PIN, LOW); // Battery status < 75%
+            digitalWrite(battLED3_PIN, LOW); // Battery status < 50%
             delay(100);
             tone(6, 400, 250);
+            digitalWrite(battLED2_PIN, HIGH); // Battery status < 75%
+            digitalWrite(battLED3_PIN, HIGH); // Battery status < 50%
             delay(100);
             break;
           case cruiser:
             Serial.println("Switching to beginner mode!");
             performanceState = beginner;
             tone(6, 1000, 100);
+            digitalWrite(battLED1_PIN, HIGH); // Battery status < 100%
             delay(100);
             tone(6, 800, 100);
+            digitalWrite(battLED2_PIN, HIGH); // Battery status < 75%
+            digitalWrite(battLED1_PIN, LOW); // Battery status < 100%
             delay(100);
             tone(6, 600, 100);
+            digitalWrite(battLED3_PIN, HIGH); // Battery status < 50%
+            digitalWrite(battLED2_PIN, LOW); // Battery status < 75%
             delay(100);
             tone(6, 440, 100);
+            digitalWrite(battLED4_PIN, HIGH); // Battery status < 25%
+            digitalWrite(battLED3_PIN, LOW); // Battery status < 50%
             delay(100);
             break;
           case beginner:
             Serial.println("Switching to sport mode!");
             performanceState = sport;
             tone(6, 440, 100);
+            digitalWrite(battLED4_PIN, HIGH); // Battery status < 25%
             delay(100);
             tone(6, 600, 100);
+            digitalWrite(battLED3_PIN, HIGH); // Battery status < 50%
+            digitalWrite(battLED4_PIN, LOW); // Battery status < 25%
             delay(100);
             tone(6, 800, 100);
+            digitalWrite(battLED2_PIN, HIGH); // Battery status < 75%
+            digitalWrite(battLED3_PIN, LOW); // Battery status < 50%
             delay(100);
             tone(6, 1000, 100);
+            digitalWrite(battLED1_PIN, HIGH); // Battery status < 100%
+            digitalWrite(battLED2_PIN, LOW); // Battery status < 75%
             delay(100);
             break;
         }
+        digitalWrite(battLED1_PIN, LOW); // Battery status < 100%
+        digitalWrite(battLED2_PIN, LOW); // Battery status < 75%
+        digitalWrite(battLED3_PIN, LOW); // Battery status < 50%
+        digitalWrite(battLED4_PIN, LOW); // Battery status < 25%
       }
       modeButtonState = reading;
     }
@@ -810,7 +842,9 @@ void loop() {
           status = read_BytesFromAddress(R_RX_PAYLOAD, quatroReturnMessage, 8); // Read message back and please don't ask me why it was 8 bytes in the remote since only one byte actually contains any data
           boardBatteryState = quatroReturnMessage[0] & 0x0F;
 
-          set_batteryState(boardBatteryState);
+          // Only display the board battery state as long as it's still relevant. It's not relevant if the remote is empty (TODO: That needs to be discussed!)
+          if (!remoteBatteryLevelCritical)
+            set_batteryState(boardBatteryState);
 
           digitalWrite(lostLED_PIN, LOW); // Connection to the board was successfully established
           //digitalWrite(lostLED_PIN, (quatroReturnMessage[0] & 0x10) == true ? LOW : HIGH); // Connection to the board was successfully established

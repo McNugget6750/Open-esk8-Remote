@@ -47,6 +47,8 @@ void init_remote(void);
 
 void set_batteryState(uint8_t value);
 
+void set_remoteBatteryAlarm();
+
 float rescaleADCThrottleValue(uint16_t input, uint16_t valueMIN, uint16_t valueMAX, uint16_t valueCenter);
 
 float exponentialCurve(float inputValue, float expoFactor);

@@ -60,6 +60,27 @@ void set_batteryState(uint8_t value)
   }
 }
 
+void set_remoteBatteryAlarm()
+{  static uint32_t oldMillis = 0; // This is good for 1,193h of battery status blinking when remote left on - not that any remote battery would last that long
+
+  if (millis() - oldMillis > 750)
+  {
+    digitalWrite(battLED1_PIN, HIGH); // Battery status < 100%
+    digitalWrite(battLED2_PIN, LOW); // Battery status < 75%
+    digitalWrite(battLED3_PIN, LOW); // Battery status < 50%
+    digitalWrite(battLED4_PIN, HIGH); // Battery status < 25%
+    
+    oldMillis = millis();
+  }
+  else if (millis() - oldMillis > 20)
+  {
+    digitalWrite(battLED1_PIN, LOW); // Battery status < 100%
+    digitalWrite(battLED2_PIN, LOW); // Battery status < 75%
+    digitalWrite(battLED3_PIN, LOW); // Battery status < 50%
+    digitalWrite(battLED4_PIN, LOW); // Battery status < 25%
+  }
+}
+
 // Rescale input values to a range from -1 to 1
 float rescaleADCThrottleValue(uint16_t input, uint16_t valueMIN, uint16_t valueMAX, uint16_t valueCenter)
 {
