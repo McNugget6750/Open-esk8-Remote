@@ -88,7 +88,7 @@ uint8_t boardMax = 230; // Value at which the board produces max brake torque - 
 float skateboardSpeed = 0.0; // value between 0 and 1 representing standstill to full throttle
 float lastSkateboardSpeed = 0.0; // value from last iteration of velocity model
 float skateboardSpeedAccelDampening = 0.004; // Factor describing acceleration behavior
-float skateboardSpeedCoastDecelIterator = 0.0001; // When coasting, using this simple integrator to reduce velocity
+float skateboardSpeedCoastDecelIterator = 0.00017; // When coasting, using this simple integrator to reduce velocity
 float skateboardSpeedBrakeDecelFactor = 0.001; // When braking, using this factor to reduce velocity
 
 void setup() {
@@ -299,7 +299,7 @@ void setup() {
 
 void loop() {
   if (mainState != pairingRemote)
-    delay(5);
+    delay(5); // This is supposed to be the only delay in the loop that is needed permanently. Gives both board and remote time to process data within their respective NRF24L01
 
   //Serial.println("Main Loop");
 
@@ -533,8 +533,14 @@ void loop() {
         throttle = throttle * 0.62;
         if (velocityState == coast || velocityState == brake) // To reduce acceleration latency, we use the velocity model data to set the new current throttle value
         {
-          lastDampedValue = lastSkateboardSpeed;
+          //lastDampedValue = lastSkateboardSpeed;
           velocityState = accel;
+        }
+        if (throttle > lastSkateboardSpeed)
+        {
+          lastDampedValue = throttle;
+          if (throttle < -0.62)
+            throttle = -0.62;
         }
         throttle = pt1_damper (throttle, dampingFactor / dampingFactorDriveModeModifier, integralPart, lastDampedValue, lastIntegralPart);
       }
@@ -572,8 +578,14 @@ void loop() {
         throttle = throttle * 0.35;
         if (velocityState == coast || velocityState == brake) // To reduce acceleration latency, we use the velocity model data to set the new current throttle value
         {
-          lastDampedValue = lastSkateboardSpeed;
+          //lastDampedValue = lastSkateboardSpeed;
           velocityState = accel;
+        }
+        if (throttle > lastSkateboardSpeed)
+        {
+          lastDampedValue = throttle;
+          if (throttle < -0.35)
+            throttle = -0.35;
         }
         throttle = pt1_damper (throttle, dampingFactor / dampingFactorDriveModeModifier, integralPart, lastDampedValue, lastIntegralPart);
       }
@@ -600,6 +612,7 @@ void loop() {
       break;
   }
 
+// Estimating the skareboard speed
   if (skateboardSpeed >= throttle)
   {
     skateboardSpeed = pt1_damper(throttle, skateboardSpeedAccelDampening, lastSkateboardSpeed);
@@ -619,6 +632,12 @@ void loop() {
     skateboardSpeed = -1;
   else if (skateboardSpeed > 0)
     skateboardSpeed = 0;
+    
+// If desired, print the actual estimated miles per hour to serial
+  //Serial.print(22.0 * -skateboardSpeed); Serial.println(" MPH");
+  //Serial.print(throttle);
+  //Serial.print("   ");
+  //Serial.println(lastSkateboardSpeed);
   
   // 6. Rescale
   //    Remove Deadzone
@@ -631,6 +650,7 @@ void loop() {
                   boardDeadzoneMax,
                   boardCenter);
 
+  //Serial.print(22.0 * -skateboardSpeed); Serial.println(" MPH");
   // Todo: If the battery is empty, we don't just want to cut power as that might be extremely dangerous!
   //       In that case, we want to ramp down the maximum available power within 10 seconds or so until idle is reached.
   // 6. Send value to board
